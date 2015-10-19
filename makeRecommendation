@@ -1,0 +1,35 @@
+CREATE OR REPLACE FUNCTION getchampsimilaritymatrix()
+  RETURNS void AS
+$BODY$
+BEGIN
+
+
+
+EXECUTE 'DROP TABLE IF EXISTS champsim;
+CREATE TABLE champsim AS
+SELECT 
+
+A.item AS champA, 
+B.item AS champB,
+COUNT(*) AS n,
+SUM(A.rating) AS sumA,
+SUM(B.rating) AS sumB,
+SUM(A.rating * B.rating) AS sumAB,
+SUM(A.rating * A.rating) AS sumAA,
+SUM(B.rating * B.rating) AS sumBB,
+
+(CASE 
+WHEN 
+(SUM(A.rating*A.rating)-SUM(A.rating)*SUM(A.rating))*(SUM(B.rating*B.rating)-SUM(B.rating)*SUM(B.rating)) = 0 THEN 0
+ELSE ((SUM(A.rating*B.rating)-(SUM(A.rating)*SUM(B.rating)/COUNT(*))) / 
+SQRT((SUM(A.rating*A.rating)-SUM(A.rating)*SUM(A.rating)/COUNT(*))*(SUM(B.rating*B.rating)-SUM(B.rating)*SUM(B.rating)/COUNT(*))))
+
+end) as pearson_score
+
+FROM "summtable" A JOIN "summtable" B ON A.summoner = B.summoner
+GROUP BY A.item, B.item
+';
+
+END
+$BODY$
+  LANGUAGE plpgsql VOLATILE

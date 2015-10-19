@@ -1,0 +1,233 @@
+<html>
+<head>
+	<title>AJAX!!!!</title>
+	<meta charset="utf-8"/>
+	<link href="main.css" rel="stylesheet" type="text/css"/>
+
+</head>
+
+<body>
+
+<h1>HOME</h1>
+
+<h4>Enter Your ID</h4>
+
+<p>summoners name: <input type="text" id="summonerName"></p>
+<button id="sumName"> get recommendation!</button>
+
+<button id="renewData"> Renew Data</button>
+
+<div id="result">Display result</div>
+
+<script src="jquery/jquery.js"></script>
+
+
+<script type = "text/javascript">
+
+
+
+    $(document).ready(function(){
+
+    var sumName = "";
+    var summonerID = "";
+    var APIKEY = "";
+
+    var result = {};
+    var counter = 1;
+
+
+    function addSummoner(){
+
+      $.ajax({
+        type: 'GET',
+        url: 'https://na.api.pvp.net/api/lol/na/v1.4/summoner/by-name/' + sumName + '?api_key=' + APIKEY,
+        dataType: 'json',
+                data: {
+
+                },
+                success: function (json) {
+
+                 //   alert(sumName);
+
+                    var sumNamenospace = sumName.replace(" ", "");
+                    sumNamenospace = sumNamenospace.toLowerCase().trim();
+                    summonerID = json[sumNamenospace].id;
+
+                      $.ajax({
+                          type: 'GET',
+                          url: 'https://na.api.pvp.net/api/lol/na/v1.3/stats/by-summoner/' + summonerID + '/ranked?api_key=' + APIKEY,
+                          dataType: 'json',
+                                  data: {
+
+                                  },
+                                  success: function (json) {
+
+                                          result = {};
+
+                                          var champDataList = json.champions.map(function(item) {
+
+                                           var numPlayed_i = item.stats.totalSessionsPlayed;
+                                           var winrate_i = 100*(item.stats.totalSessionsWon/numPlayed_i);
+                                           var winrateScore_i = 0;
+
+                                           if(winrate_i<30){
+                                             winrateScore_i = 1;
+                                           } else if(winrate_i>=30 && winrate_i<40){
+                                             winrateScore_i = 2;
+                                           } else if(winrate_i>=40 && winrate_i<50){
+                                             winrateScore_i = 3;
+                                           } else if(winrate_i>=50 && winrate_i<55){
+                                             winrateScore_i = 4;
+                                           } else {
+                                             winrateScore_i = 5;
+                                           }
+
+                                            return {
+                                              id: item.id,
+                                              winrateScore: winrateScore_i,
+                                              numPlayed: numPlayed_i
+                                            };
+                                      });
+
+                                      champDataList.sort(function(a, b) {return b.numPlayed - a.numPlayed;});
+                                     
+                                      getResults(champDataList);
+
+                                  },
+                                  error: function (XMLHttpRequest, textStatus, errorThrown) {
+                                      alert("error getting Summoner data! Try Again");
+                                  }
+                         });
+                },
+                error: function (XMLHttpRequest, textStatus, errorThrown) {
+                    alert("error getting Summoner data! Try Again");
+                }
+
+      });
+
+    }
+
+
+    function getResults(champDataList){                       
+
+        var champ = '';
+          $.ajax({
+             type: 'GET',
+                url: 'https://na.api.pvp.net/api/lol/static-data/na/v1.2/champion/' + champDataList[counter].id + '?api_key=' + APIKEY,
+                dataType: 'json',
+                        success: function (json) {
+                              champ = json.name;
+                              result[champ] = (6-counter)*(0.4) + (champDataList[counter].winrateScore)*(0.6);
+                           //  alert(champ + result[champ]);
+                              counter++;
+                              if (counter < 6){
+                                getResults(champDataList);
+                              }else{
+                                counter = 1;
+                                
+                                alert(sumName);
+                                doQuery();
+                              }
+                        },
+                        error: function (XMLHttpRequest, textStatus, errorThrown) {
+                            alert("error getting static data! Q_Q");
+                        }
+               });
+    }
+
+
+
+    function doQuery(){
+
+        $.ajax({ url: 'doquery.php',
+               data: {most1: result, sumName: sumName},
+               type: 'POST',
+               success: function(msg) {
+                   postResult(msg);
+
+                }
+            });
+    }
+
+
+
+    $('#sumName').on('click', function(){
+
+    	sumName = $("#summonerName").val();
+
+    	addSummoner(sumName);
+
+
+    });
+
+    function postResult(msg1){
+        $('#result').html(msg1);
+    }
+
+    var counter2=0;
+
+    function populateData(ranSumList){
+
+            
+             var len = ranSumList.length;
+          //   window.setTimeout(function(){}, 3000);
+
+              setTimeout(function(){populateData(ranSumList);}, 5000);
+
+              sumName = ranSumList[counter2];
+              addSummoner(ranSumList[counter2]);
+
+              counter2++;
+              if(counter2<1){
+                  populateData(ranSumList);
+              }else{
+                counter2=0;
+              }
+                                          
+
+    }
+
+    $('#renewData').on('click', function(){
+
+      var ranSumList = [];
+
+        $.ajax({
+            type: 'GET',
+            url: 'https://na.api.pvp.net/observer-mode/rest/featured/?api_key=' + APIKEY,
+            dataType: 'json',
+                data: {
+
+                },
+                success: function (json) {
+                    alert("success");
+                    var games = json.gameList;
+
+                    for(i=0; i<games.length; i++){
+                      p = games[i].participants;
+                      for(j=0; j<p.length; j++){
+                        if(!p[j].bot){
+
+                             ranSumList.push(p[j].summonerName);
+                        }
+                      }
+                    }
+                    populateData(ranSumList);
+
+                },
+                error: function (XMLHttpRequest, textStatus, errorThrown) {
+                    alert("error getting Summoner data!");
+                    
+                }
+        });
+
+    });
+
+
+});
+
+</script>
+
+
+</body>
+</html>
+
